@@ -63,6 +63,18 @@ const envSchema = z.object({
    */
   RAG_SIMILARITY_THRESHOLD: z.coerce.number().min(0).max(1).default(0.22),
   RAG_MAX_CONTEXT_CHARS: z.coerce.number().int().min(1000).max(50000).default(12000),
+  /** Tavily web search for Research Assistant (backend only). */
+  TAVILY_API_KEY: z.string().optional().default(""),
+  RESEARCH_MAX_RESULTS: z.coerce.number().int().min(1).max(10).default(6),
+  RESEARCH_MAX_FOLLOWUP_QUERIES: z.coerce.number().int().min(0).max(3).default(2),
+  RESEARCH_FETCH_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
+  RESEARCH_MAX_PAGE_BYTES: z.coerce
+    .number()
+    .int()
+    .min(10_000)
+    .max(2_000_000)
+    .default(500_000),
+  RESEARCH_MODEL: z.string().optional().default(""),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -89,4 +101,8 @@ export function hasOpenAiApiKey(): boolean {
 
 export function hasAnthropicApiKey(): boolean {
   return Boolean(env.ANTHROPIC_API_KEY?.trim());
+}
+
+export function hasTavilyApiKey(): boolean {
+  return Boolean(env.TAVILY_API_KEY?.trim());
 }

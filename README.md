@@ -39,7 +39,11 @@ AI-PROJECT-OCT-2026/
         │   ├── chat/
         │   ├── tasks/
         │   ├── semantic-search/
+        │   ├── rag/
+        │   ├── research/
         │   └── health/
+        ├── services/web-search/
+        ├── services/web-fetch/
         └── utils/logger.ts
 ```
 
@@ -51,8 +55,11 @@ AI-PROJECT-OCT-2026/
 | `modules/tasks` | `tasksRouter`, `taskAssistantRouter`, `taskService`, `taskAssistantService` | Task CRUD, tool calling, delete confirmation |
 | `modules/semantic-search` | `semanticSearchRouter`, `semanticSearchService` | Document ingest, embeddings, similarity search |
 | `modules/rag` | `ragRouter`, `ragService` | Retrieval-augmented Q&A, citations, sessions |
+| `modules/research` | `researchRouter`, `researchService` | Web research, citations, sessions |
 | `modules/health` | `healthRouter` | API and DB health checks |
 | `services/ai` | `getAiProviderBundle`, provider types | OpenAI / Anthropic clients — modules never instantiate SDKs directly |
+| `services/web-search` | `getWebSearchProvider` | Tavily web search adapter |
+| `services/web-fetch` | `fetchPublicPage` | SSRF-safe public page fetch |
 
 ### AI provider architecture
 
@@ -93,6 +100,23 @@ Reuses Project 3 tables, embeddings, and pgvector retrieval. Adds:
   - `GET /api/rag/sessions/:id`
   - `DELETE /api/rag/sessions/:id`
 - **Config:** `RAG_MODEL`, `RAG_DEFAULT_TOP_K`, `RAG_SIMILARITY_THRESHOLD` (default `0.22`, not a calibrated confidence), `RAG_MAX_CONTEXT_CHARS`
+
+### Project 5 — AI Research Assistant
+
+Live web research with validated citations. Details: `src/modules/research/README.md`.
+
+- **Migrations:** `0009_create_research_sessions`, `0010_add_research_search_queries`
+- **Search:** Tavily (`TAVILY_API_KEY`, backend-only). Missing key returns **503** with a clear configuration error — the API does not invent search results.
+- **Fetch:** SSRF-safe HTTP(S) retrieval with private-network blocking, redirect revalidation, size/timeout/content-type limits; falls back to snippets
+- **Pipeline:** search → normalize/dedupe/rank → optional page fetch → LLM structured report → citation ID validation → PostgreSQL persistence
+- **Endpoints:**
+  - `POST /api/research/run`
+  - `POST /api/research/search`
+  - `GET /api/research/sessions`
+  - `GET /api/research/sessions/:id`
+  - `DELETE /api/research/sessions/:id`
+- **Config:** `TAVILY_API_KEY`, `RESEARCH_MAX_RESULTS`, `RESEARCH_MAX_FOLLOWUP_QUERIES`, `RESEARCH_FETCH_TIMEOUT_MS`, `RESEARCH_MAX_PAGE_BYTES`, `RESEARCH_MODEL`
+- **UI:** `/features/research-agent`
 
 ### How to add a backend feature
 
@@ -146,6 +170,9 @@ Preserve local credentials in `.env`. Never commit `.env` or real API keys.
 | `SEMANTIC_SEARCH_CHUNK_SIZE` / `SEMANTIC_SEARCH_CHUNK_OVERLAP` | Chunking defaults |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Optional Anthropic text provider |
 | `TASK_DELETE_SECRET` | HMAC secret for delete confirmation tokens |
+| `RAG_*` | PDF RAG generation / retrieval tunables |
+| `TAVILY_API_KEY` | Research Assistant web search (required for live search) |
+| `RESEARCH_*` | Research result/fetch limits and optional model override |
 
 Compose injects `DATABASE_URL` using the `postgres` service hostname. Do not bake secrets into images.
 

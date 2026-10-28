@@ -6,6 +6,8 @@ import { migration as migration0005 } from "./0005_create_tasks";
 import { migration as migration0006 } from "./0006_create_semantic_search";
 import { migration as migration0007 } from "./0007_add_chunk_page_metadata";
 import { migration as migration0008 } from "./0008_create_rag_sessions";
+import { migration as migration0009 } from "./0009_create_research_sessions";
+import { migration as migration0010 } from "./0010_add_research_search_queries";
 import type { Migration } from "../types";
 
 /**
@@ -22,4 +24,6 @@ export const migrations: Migration[] = [
   migration0006,
   migration0007,
   migration0008,
+  migration0009,
+  migration0010,
 ];

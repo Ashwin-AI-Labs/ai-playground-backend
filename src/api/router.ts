@@ -2,6 +2,7 @@ import { Router } from "express";
 import { chatRouter } from "../modules/chat";
 import { healthRouter } from "../modules/health";
 import { ragRouter } from "../modules/rag";
+import { researchRouter } from "../modules/research";
 import { semanticSearchRouter } from "../modules/semantic-search";
 import { taskAssistantRouter, tasksRouter } from "../modules/tasks";
 
@@ -105,6 +106,31 @@ apiRouter.get("/", (_req, res) => {
         path: "/api/rag/sessions/:id",
         description: "Delete a RAG session",
       },
+      {
+        method: "POST",
+        path: "/api/research/run",
+        description: "Run AI research with web search and citations",
+      },
+      {
+        method: "POST",
+        path: "/api/research/search",
+        description: "Preview web search results",
+      },
+      {
+        method: "GET",
+        path: "/api/research/sessions",
+        description: "List research sessions",
+      },
+      {
+        method: "GET",
+        path: "/api/research/sessions/:id",
+        description: "Get a research session",
+      },
+      {
+        method: "DELETE",
+        path: "/api/research/sessions/:id",
+        description: "Delete a research session",
+      },
     ],
   });
 });
@@ -115,3 +141,4 @@ apiRouter.use("/task-assistant", taskAssistantRouter);
 apiRouter.use("/tasks", tasksRouter);
 apiRouter.use("/semantic-search", semanticSearchRouter);
 apiRouter.use("/rag", ragRouter);
+apiRouter.use("/research", researchRouter);
