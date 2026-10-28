@@ -1,0 +1,42 @@
+{
+  "name": "ai-playground-backend",
+  "version": "1.0.0",
+  "description": "REST API for the AI Playground application",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate": "tsx src/database/migrate-cli.ts up",
+    "db:migrate:status": "tsx src/database/migrate-cli.ts status"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^2.5.0",
+    "openai": "^7.43.0",
+    "pdf-parse": "^2.4.5",
+    "pg": "^8.13.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^22.13.10",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/pg": "^8.11.11",
+    "@types/supertest": "^7.2.1",
+    "supertest": "^7.3.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^5.0.5"
+  }
+}

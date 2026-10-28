@@ -1,0 +1,157 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
+services:
+  postgres:
+    # pg16-compatible image with the pgvector extension preinstalled.
+    # Keeps PostgreSQL 16 so the existing named volume remains compatible.
+    image: pgvector/pgvector:pg16
+    container_name: ai-playground-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-playground}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_locally}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_playground}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ai-playground-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-playground-migrate
+    restart: "no"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-playground}:${POSTGRES_PASSWORD:-change_me_locally}@postgres:5432/${POSTGRES_DB:-ai_playground}"
+      FRONTEND_URL: "${FRONTEND_URL:-http://localhost:5173}"
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      OPENAI_EMBEDDING_DIMENSIONS: ${OPENAI_EMBEDDING_DIMENSIONS:-1536}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-5}
+      TASK_DELETE_SECRET: ${TASK_DELETE_SECRET:-local-dev-task-delete-secret}
+      SEMANTIC_SEARCH_MAX_FILE_SIZE_MB: ${SEMANTIC_SEARCH_MAX_FILE_SIZE_MB:-10}
+      SEMANTIC_SEARCH_CHUNK_SIZE: ${SEMANTIC_SEARCH_CHUNK_SIZE:-800}
+      SEMANTIC_SEARCH_CHUNK_OVERLAP: ${SEMANTIC_SEARCH_CHUNK_OVERLAP:-120}
+      PORT: "3000"
+    volumes:
+      - .:/app
+      - backend_node_modules:/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ai-playground-network
+    command: ["npm", "run", "db:migrate"]
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-playground-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    environment:
+      PORT: "3000"
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-playground}:${POSTGRES_PASSWORD:-change_me_locally}@postgres:5432/${POSTGRES_DB:-ai_playground}"
+      FRONTEND_URL: "${FRONTEND_URL:-http://localhost:5173}"
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      OPENAI_EMBEDDING_DIMENSIONS: ${OPENAI_EMBEDDING_DIMENSIONS:-1536}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-5}
+      TASK_DELETE_SECRET: ${TASK_DELETE_SECRET:-local-dev-task-delete-secret}
+      SEMANTIC_SEARCH_MAX_FILE_SIZE_MB: ${SEMANTIC_SEARCH_MAX_FILE_SIZE_MB:-10}
+      SEMANTIC_SEARCH_CHUNK_SIZE: ${SEMANTIC_SEARCH_CHUNK_SIZE:-800}
+      SEMANTIC_SEARCH_CHUNK_OVERLAP: ${SEMANTIC_SEARCH_CHUNK_OVERLAP:-120}
+    volumes:
+      - .:/app
+      - backend_node_modules:/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - ai-playground-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ../ai-playground-frontend
+      dockerfile: Dockerfile
+    container_name: ai-playground-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      VITE_API_BASE_URL: "${VITE_API_BASE_URL:-http://localhost:3000/api}"
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - type: bind
+        source: ../ai-playground-frontend
+        target: /app
+      - type: volume
+        source: frontend_node_modules
+        target: /app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - ai-playground-network
+
+  adminer:
+    image: adminer:4
+    container_name: ai-playground-adminer
+    restart: unless-stopped
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ai-playground-network
+
+networks:
+  ai-playground-network:
+    name: ai-playground-network
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: ai-playground-postgres-data
+  backend_node_modules:
+    name: ai-playground-backend-node-modules
+  frontend_node_modules:
+    name: ai-playground-frontend-node-modules
