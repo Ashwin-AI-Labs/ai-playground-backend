@@ -106,6 +106,7 @@ export function createResearchService(deps?: {
       maxResults?: number;
       recencyDays?: number | null;
       includeDomains?: string[];
+      userId: string;
     }): Promise<ResearchRunResult> {
       const started = Date.now();
       const question = input.question.trim();
@@ -126,6 +127,7 @@ export function createResearchService(deps?: {
       const session = await repository.createSession({
         title: deriveTitle(question),
         question,
+        userId: input.userId,
       });
 
       try {
@@ -299,7 +301,7 @@ export function createResearchService(deps?: {
       }
     },
 
-    async listSessions(input: { limit: number; offset: number }) {
+    async listSessions(input: { limit: number; offset: number; userId: string }) {
       const result = await repository.listSessions(input);
       return {
         sessions: result.sessions.map(toSummary),
@@ -309,8 +311,8 @@ export function createResearchService(deps?: {
       };
     },
 
-    async getSession(sessionId: string): Promise<ResearchRunResult> {
-      const session = await repository.getSessionById(sessionId);
+    async getSession(sessionId: string, userId: string): Promise<ResearchRunResult> {
+      const session = await repository.getSessionById(sessionId, userId);
       if (!session) {
         throw new AppError(404, "Research session not found");
       }
@@ -328,8 +330,8 @@ export function createResearchService(deps?: {
       };
     },
 
-    async deleteSession(sessionId: string): Promise<void> {
-      const deleted = await repository.deleteSession(sessionId);
+    async deleteSession(sessionId: string, userId: string): Promise<void> {
+      const deleted = await repository.deleteSession(sessionId, userId);
       if (!deleted) {
         throw new AppError(404, "Research session not found");
       }

@@ -91,6 +91,7 @@ export function createTaskAssistantService(
     async chat(
       message: string,
       history: TaskAssistantHistoryItem[] = [],
+      userId: string = "",
     ): Promise<TaskAssistantResult> {
       const trimmed = message.trim();
       if (!trimmed) {
@@ -129,7 +130,7 @@ export function createTaskAssistantService(
 
         for (const call of functionCalls) {
           try {
-            const executed = await executeTaskTool(call.name, call.arguments);
+            const executed = await executeTaskTool(call.name, call.arguments, userId);
             actions.push(executed.action);
 
             if (

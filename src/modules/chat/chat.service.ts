@@ -47,13 +47,13 @@ export function createChatService(
   textProvider: TextGenerationProvider = getAiProviderBundle().text,
 ) {
   return {
-    async listConversations() {
-      const conversations = await listConversations();
+    async listConversations(userId: string) {
+      const conversations = await listConversations(userId);
       return conversations.map(toConversationDto);
     },
 
-    async getConversation(conversationId: string) {
-      const conversation = await getConversationById(conversationId);
+    async getConversation(conversationId: string, userId: string) {
+      const conversation = await getConversationById(conversationId, userId);
       if (!conversation) {
         throw new AppError(404, "Conversation not found");
       }
@@ -65,7 +65,7 @@ export function createChatService(
       };
     },
 
-    async sendMessage(message: string, conversationId?: string) {
+    async sendMessage(message: string, userId: string, conversationId?: string) {
       const trimmed = message.trim();
       if (!trimmed) {
         throw new AppError(400, "Message cannot be empty");
@@ -75,13 +75,13 @@ export function createChatService(
       let isNewConversation = false;
 
       if (conversationId) {
-        const existing = await getConversationById(conversationId);
+        const existing = await getConversationById(conversationId, userId);
         if (!existing) {
           throw new AppError(404, "Conversation not found");
         }
         conversation = existing;
       } else {
-        conversation = await createConversation(deriveTitle(trimmed));
+        conversation = await createConversation(deriveTitle(trimmed), userId);
         isNewConversation = true;
       }
 
@@ -106,12 +106,12 @@ export function createChatService(
       );
 
       if (isNewConversation) {
-        await updateConversationTitle(conversation.id, deriveTitle(trimmed));
+        await updateConversationTitle(conversation.id, deriveTitle(trimmed), userId);
       } else {
-        await touchConversation(conversation.id);
+        await touchConversation(conversation.id, userId);
       }
 
-      const refreshed = await getConversationById(conversation.id);
+      const refreshed = await getConversationById(conversation.id, userId);
       if (!refreshed) {
         throw new AppError(500, "Conversation disappeared after save");
       }

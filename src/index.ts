@@ -9,9 +9,6 @@ async function start() {
     console.log(
       `AI Playground API listening on port ${env.PORT} (${env.NODE_ENV})`,
     );
-    console.log(
-      "Ensure database migrations are applied before serving traffic (npm run db:migrate).",
-    );
   });
 
   let isShuttingDown = false;

@@ -26,13 +26,6 @@ type TaskRow = {
   updated_at: Date;
 };
 
-export type CreateTaskInput = {
-  title: string;
-  description?: string | null;
-  priority: TaskPriority;
-  dueDate?: Date | null;
-};
-
 export type UpdateTaskInput = {
   title?: string;
   description?: string | null;
@@ -60,37 +53,52 @@ function mapTask(row: TaskRow): TaskRecord {
   };
 }
 
+export type CreateTaskInput = {
+  title: string;
+  description?: string | null;
+  priority: TaskPriority;
+  dueDate?: Date | null;
+  userId: string;
+};
+
 export async function createTask(input: CreateTaskInput): Promise<TaskRecord> {
   const result = await pool.query<TaskRow>(
-    `INSERT INTO tasks (title, description, priority, due_date)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO tasks (title, description, priority, due_date, user_id)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING id, title, description, priority, status, due_date, created_at, updated_at`,
     [
       input.title,
       input.description ?? null,
       input.priority,
       input.dueDate ?? null,
+      input.userId,
     ],
   );
 
   return mapTask(result.rows[0]);
 }
 
-export async function getTaskById(taskId: string): Promise<TaskRecord | null> {
+export async function getTaskById(
+  taskId: string,
+  userId: string,
+): Promise<TaskRecord | null> {
   const result = await pool.query<TaskRow>(
     `SELECT id, title, description, priority, status, due_date, created_at, updated_at
      FROM tasks
-     WHERE id = $1`,
-    [taskId],
+     WHERE id = $1 AND user_id = $2`,
+    [taskId, userId],
   );
 
   const row = result.rows[0];
   return row ? mapTask(row) : null;
 }
 
-export async function listTasks(filter: ListTasksFilter = {}): Promise<TaskRecord[]> {
-  const clauses: string[] = [];
-  const values: unknown[] = [];
+export async function listTasks(
+  userId: string,
+  filter: Omit<ListTasksFilter, "userId"> = {},
+): Promise<TaskRecord[]> {
+  const clauses: string[] = [`user_id = $1`];
+  const values: unknown[] = [userId];
 
   if (filter.status && filter.status !== "all") {
     values.push(filter.status);
@@ -105,7 +113,7 @@ export async function listTasks(filter: ListTasksFilter = {}): Promise<TaskRecor
   const limit = Math.min(Math.max(filter.limit ?? 50, 1), 100);
   values.push(limit);
 
-  const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+  const where = `WHERE ${clauses.join(" AND ")}`;
 
   const result = await pool.query<TaskRow>(
     `SELECT id, title, description, priority, status, due_date, created_at, updated_at
@@ -121,6 +129,7 @@ export async function listTasks(filter: ListTasksFilter = {}): Promise<TaskRecor
 
 export async function updateTask(
   taskId: string,
+  userId: string,
   input: UpdateTaskInput,
 ): Promise<TaskRecord | null> {
   const sets: string[] = [];
@@ -148,16 +157,17 @@ export async function updateTask(
   }
 
   if (sets.length === 0) {
-    return getTaskById(taskId);
+    return getTaskById(taskId, userId);
   }
 
   sets.push("updated_at = NOW()");
   values.push(taskId);
+  values.push(userId);
 
   const result = await pool.query<TaskRow>(
     `UPDATE tasks
      SET ${sets.join(", ")}
-     WHERE id = $${values.length}
+     WHERE id = $${values.length - 1} AND user_id = $${values.length}
      RETURNING id, title, description, priority, status, due_date, created_at, updated_at`,
     values,
   );
@@ -166,12 +176,15 @@ export async function updateTask(
   return row ? mapTask(row) : null;
 }
 
-export async function deleteTask(taskId: string): Promise<TaskRecord | null> {
+export async function deleteTask(
+  taskId: string,
+  userId: string,
+): Promise<TaskRecord | null> {
   const result = await pool.query<TaskRow>(
     `DELETE FROM tasks
-     WHERE id = $1
+     WHERE id = $1 AND user_id = $2
      RETURNING id, title, description, priority, status, due_date, created_at, updated_at`,
-    [taskId],
+    [taskId, userId],
   );
 
   const row = result.rows[0];

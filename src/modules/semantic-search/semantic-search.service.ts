@@ -54,6 +54,7 @@ export function createSemanticSearchService(
       buffer: Buffer;
       originalFilename: string;
       mimeType: string;
+      userId: string;
     }): Promise<SearchDocumentDto> {
       const maxBytes = Math.floor(
         env.SEMANTIC_SEARCH_MAX_FILE_SIZE_MB * 1024 * 1024,
@@ -68,6 +69,7 @@ export function createSemanticSearchService(
 
       const existing = await repository.findCompletedByContentHash(
         extracted.contentHash,
+        input.userId,
       );
       if (existing) {
         return toDocumentDto(existing, { duplicateOf: true });
@@ -81,6 +83,7 @@ export function createSemanticSearchService(
         fileSizeBytes: input.buffer.byteLength,
         contentHash: extracted.contentHash,
         status: "processing",
+        userId: input.userId,
       });
 
       try {
@@ -145,7 +148,7 @@ export function createSemanticSearchService(
       }
     },
 
-    async listDocuments(input: { limit: number; offset: number }) {
+    async listDocuments(input: { limit: number; offset: number; userId: string }) {
       const result = await repository.listDocuments(input);
       return {
         documents: result.documents.map((doc) => toDocumentDto(doc)),
@@ -155,16 +158,16 @@ export function createSemanticSearchService(
       };
     },
 
-    async getDocument(documentId: string): Promise<SearchDocumentDto> {
-      const document = await repository.getDocumentById(documentId);
+    async getDocument(documentId: string, userId: string): Promise<SearchDocumentDto> {
+      const document = await repository.getDocumentById(documentId, userId);
       if (!document) {
         throw new AppError(404, "Document not found");
       }
       return toDocumentDto(document);
     },
 
-    async deleteDocument(documentId: string): Promise<void> {
-      const deleted = await repository.deleteDocument(documentId);
+    async deleteDocument(documentId: string, userId: string): Promise<void> {
+      const deleted = await repository.deleteDocument(documentId, userId);
       if (!deleted) {
         throw new AppError(404, "Document not found");
       }
@@ -174,8 +177,9 @@ export function createSemanticSearchService(
       query: string;
       limit: number;
       documentIds: string[];
+      userId: string;
     }): Promise<{ results: SearchResultDto[]; query: string }> {
-      const completedCount = await repository.countCompletedDocuments();
+      const completedCount = await repository.countCompletedDocuments(input.userId);
       if (completedCount === 0) {
         return { results: [], query: input.query };
       }
@@ -190,6 +194,7 @@ export function createSemanticSearchService(
         limit: input.limit,
         documentIds:
           input.documentIds.length > 0 ? input.documentIds : undefined,
+        userId: input.userId,
       });
 
       const results: SearchResultDto[] = hits.map((hit, index) => ({

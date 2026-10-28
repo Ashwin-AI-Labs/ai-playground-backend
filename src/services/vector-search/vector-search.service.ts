@@ -25,15 +25,22 @@ export async function searchSimilarChunks(input: {
   limit: number;
   documentIds?: string[];
   minSimilarity?: number;
+  userId?: string;
 }): Promise<SimilarityHit[]> {
   const vectorLiteral = toPgVectorLiteral(input.queryEmbedding);
   const params: unknown[] = [vectorLiteral, input.limit];
   let documentFilter = "";
+  let userFilter = "";
   let similarityFilter = "";
 
   if (input.documentIds && input.documentIds.length > 0) {
     params.push(input.documentIds);
     documentFilter = `AND d.id = ANY($${params.length}::bigint[])`;
+  }
+
+  if (input.userId) {
+    params.push(input.userId);
+    userFilter = `AND d.user_id = $${params.length}`;
   }
 
   if (
@@ -73,6 +80,7 @@ export async function searchSimilarChunks(input: {
       INNER JOIN search_documents d ON d.id = c.document_id
       WHERE d.status = 'completed'
         ${documentFilter}
+        ${userFilter}
         ${similarityFilter}
       ORDER BY c.embedding <=> $1::vector ASC
       LIMIT $2

@@ -221,6 +221,7 @@ describe("research service", () => {
     const result = await service.run({
       question: "Compare React and Angular for enterprise apps",
       maxResults: 3,
+      userId: "user-1",
     });
 
     expect(result.status).toBe("completed");
@@ -249,6 +250,7 @@ describe("research service", () => {
 
     const result = await service.run({
       question: "Obscure topic with no results",
+      userId: "user-1",
     });
     expect(result.insufficientEvidence).toBe(true);
     expect(result.sources).toEqual([]);
@@ -268,7 +270,7 @@ describe("research service", () => {
     });
 
     await expect(
-      service.run({ question: "What is RAG adoption in enterprises?" }),
+      service.run({ question: "What is RAG adoption in enterprises?", userId: "user-1" }),
     ).rejects.toMatchObject({ statusCode: 503 });
     expect(repositoryMock.updateSession).toHaveBeenCalledWith(
       "11",
@@ -299,7 +301,7 @@ describe("research service", () => {
     });
 
     await expect(
-      service.run({ question: "Research vector databases" }),
+      service.run({ question: "Research vector databases", userId: "user-1" }),
     ).rejects.toMatchObject({ statusCode: 502 });
   });
 
@@ -373,19 +375,19 @@ describe("research service", () => {
       },
     });
 
-    const listed = await service.listSessions({ limit: 10, offset: 0 });
+    const listed = await service.listSessions({ limit: 10, offset: 0, userId: "user-1" });
     expect(listed.total).toBe(1);
     expect(listed.sessions[0].id).toBe("11");
 
-    const loaded = await service.getSession("11");
+    const loaded = await service.getSession("11", "user-1");
     expect(loaded.searchQueries).toEqual(["Compare React and Angular"]);
     expect(loaded.sources).toHaveLength(1);
 
-    await service.deleteSession("11");
-    expect(repositoryMock.deleteSession).toHaveBeenCalledWith("11");
+    await service.deleteSession("11", "user-1");
+    expect(repositoryMock.deleteSession).toHaveBeenCalledWith("11", "user-1");
 
     repositoryMock.getSessionById.mockResolvedValue(null);
-    await expect(service.getSession("999")).rejects.toMatchObject({
+    await expect(service.getSession("999", "user-1")).rejects.toMatchObject({
       statusCode: 404,
     });
   });
@@ -429,6 +431,7 @@ describe("research service", () => {
 
     const result = await service.run({
       question: "Is prompt injection a risk in research agents?",
+      userId: "user-1",
     });
     expect(result.status).toBe("completed");
     const prompt = text.generateText.mock.calls[0][0].messages[0].content as string;

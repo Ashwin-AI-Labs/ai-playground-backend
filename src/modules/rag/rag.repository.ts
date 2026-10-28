@@ -54,24 +54,28 @@ function mapMessage(row: MessageRow): RagMessageRecord {
   };
 }
 
-export async function createSession(title: string): Promise<RagSessionRecord> {
+export async function createSession(
+  title: string,
+  userId: string,
+): Promise<RagSessionRecord> {
   const result = await pool.query<SessionRow>(
     `
-      INSERT INTO rag_sessions (title)
-      VALUES ($1)
+      INSERT INTO rag_sessions (title, user_id)
+      VALUES ($1, $2)
       RETURNING *
     `,
-    [title.slice(0, 120)],
+    [title.slice(0, 120), userId],
   );
   return mapSession(result.rows[0]);
 }
 
 export async function getSessionById(
   sessionId: string,
+  userId: string,
 ): Promise<RagSessionRecord | null> {
   const result = await pool.query<SessionRow>(
-    `SELECT * FROM rag_sessions WHERE id = $1`,
-    [sessionId],
+    `SELECT * FROM rag_sessions WHERE id = $1 AND user_id = $2`,
+    [sessionId, userId],
   );
   return result.rows[0] ? mapSession(result.rows[0]) : null;
 }
@@ -83,23 +87,31 @@ export async function touchSession(sessionId: string): Promise<void> {
   );
 }
 
-export async function listSessions(limit: number): Promise<RagSessionRecord[]> {
+export async function listSessions(
+  userId: string,
+  limit: number,
+): Promise<RagSessionRecord[]> {
   const result = await pool.query<SessionRow>(
     `
       SELECT *
       FROM rag_sessions
+      WHERE user_id = $1
       ORDER BY updated_at DESC, id DESC
-      LIMIT $1
+      LIMIT $2
     `,
-    [limit],
+    [userId, limit],
   );
   return result.rows.map(mapSession);
 }
 
-export async function deleteSession(sessionId: string): Promise<boolean> {
-  const result = await pool.query(`DELETE FROM rag_sessions WHERE id = $1`, [
-    sessionId,
-  ]);
+export async function deleteSession(
+  sessionId: string,
+  userId: string,
+): Promise<boolean> {
+  const result = await pool.query(
+    `DELETE FROM rag_sessions WHERE id = $1 AND user_id = $2`,
+    [sessionId, userId],
+  );
   return (result.rowCount ?? 0) > 0;
 }
 
@@ -252,21 +264,35 @@ export async function listRecentHistory(
 
 export async function countCompletedDocuments(
   documentIds?: string[],
+  userId?: string,
 ): Promise<number> {
   if (documentIds && documentIds.length > 0) {
+    const params: unknown[] = [documentIds];
+    let userClause = "";
+    if (userId) {
+      params.push(userId);
+      userClause = `AND user_id = $${params.length}`;
+    }
     const result = await pool.query<{ count: string }>(
       `
         SELECT COUNT(*)::text AS count
         FROM search_documents
-        WHERE status = 'completed' AND id = ANY($1::bigint[])
+        WHERE status = 'completed' AND id = ANY($1::bigint[]) ${userClause}
       `,
-      [documentIds],
+      params,
     );
     return Number(result.rows[0]?.count ?? 0);
   }
 
+  const params: unknown[] = [];
+  let userClause = "";
+  if (userId) {
+    params.push(userId);
+    userClause = `AND user_id = $${params.length}`;
+  }
   const result = await pool.query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM search_documents WHERE status = 'completed'`,
+    `SELECT COUNT(*)::text AS count FROM search_documents WHERE status = 'completed' ${userClause}`,
+    params,
   );
   return Number(result.rows[0]?.count ?? 0);
 }

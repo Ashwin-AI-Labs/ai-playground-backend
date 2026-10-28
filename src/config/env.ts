@@ -75,6 +75,67 @@ const envSchema = z.object({
     .max(2_000_000)
     .default(500_000),
   RESEARCH_MODEL: z.string().optional().default(""),
+  /** Document summarizer (Project 6) — LangChain.js pipeline. */
+  SUMMARIZER_MODEL: z.string().optional().default(""),
+  SUMMARIZER_MAX_FILE_SIZE_MB: z.coerce.number().positive().max(50).default(10),
+  SUMMARIZER_CHUNK_SIZE: z.coerce.number().int().min(500).max(8000).default(3000),
+  SUMMARIZER_CHUNK_OVERLAP: z.coerce.number().int().min(0).max(2000).default(300),
+  SUMMARIZER_MAX_CHUNKS: z.coerce.number().int().min(1).max(40).default(24),
+  SUMMARIZER_DIRECT_MAX_CHARS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .max(100_000)
+    .default(12_000),
+  SUMMARIZER_MAP_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(3),
+  SUMMARIZER_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(5000)
+    .max(180_000)
+    .default(60_000),
+
+  // ─── Auth ──────────────────────────────────────────────────────────────────
+  JWT_ACCESS_SECRET: z
+    .string()
+    .min(32, "JWT_ACCESS_SECRET must be at least 32 characters")
+    .default(
+      "local-dev-jwt-access-secret-please-change-in-production-min32chars",
+    ),
+  JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(14),
+  REFRESH_COOKIE_NAME: z.string().min(1).default("playground_refresh"),
+  COOKIE_SECURE: z
+    .union([z.boolean(), z.string()])
+    .transform((val) =>
+      val === "true" || val === true ? true : val === "false" || val === false ? false : Boolean(val),
+    )
+    .default(false),
+  COOKIE_SAME_SITE: z.enum(["lax", "strict", "none"]).default("none"),
+
+  // ─── Email / SMTP ─────────────────────────────────────────────────────────
+  EMAIL_PROVIDER: z.string().default("smtp"),
+  SMTP_HOST: z.string().default("localhost"),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_SECURE: z
+    .union([z.boolean(), z.string()])
+    .transform((val) =>
+      val === "true" || val === true ? true : false,
+    )
+    .default(false),
+  SMTP_USER: z.string().optional().default(""),
+  SMTP_PASS: z.string().optional().default(""),
+  MAIL_FROM_NAME: z.string().default("AI Playground"),
+  MAIL_FROM_EMAIL: z.string().default("noreply@ai-playground.local"),
+
+  // ─── OTP ──────────────────────────────────────────────────────────────────
+  OTP_TTL_SECONDS: z.coerce.number().int().positive().default(600),
+  OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
+  OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(60),
+
+  // ─── Auth rate limiting (in-memory) ──────────────────────────────────────
+  AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
 });
 
 export type Env = z.infer<typeof envSchema>;

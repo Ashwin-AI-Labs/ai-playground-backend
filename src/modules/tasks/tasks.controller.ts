@@ -19,7 +19,8 @@ export async function listTasks(
 ): Promise<void> {
   try {
     const query = listTasksQuerySchema.parse(req.query);
-    const tasks = await taskService.list(query);
+    const userId = req.authUser!.id;
+    const tasks = await taskService.list(userId, query);
     res.json({ success: true, tasks });
   } catch (error) {
     next(error);
@@ -33,7 +34,8 @@ export async function getTask(
 ): Promise<void> {
   try {
     const id = numericIdSchema.parse(req.params.id);
-    const task = await taskService.getById(id);
+    const userId = req.authUser!.id;
+    const task = await taskService.getById(id, userId);
     res.json({ success: true, task });
   } catch (error) {
     if (error instanceof ZodError) {
@@ -51,11 +53,13 @@ export async function createTask(
 ): Promise<void> {
   try {
     const body = createTaskSchema.parse(req.body);
+    const userId = req.authUser!.id;
     const task = await taskService.create({
       title: body.title,
       description: body.description,
       priority: body.priority,
       dueDate: body.dueDate ? new Date(body.dueDate) : null,
+      userId,
     });
     res.status(201).json({ success: true, task });
   } catch (error) {
@@ -70,8 +74,9 @@ export async function updateTask(
 ): Promise<void> {
   try {
     const id = numericIdSchema.parse(req.params.id);
+    const userId = req.authUser!.id;
     const body = updateTaskSchema.parse(req.body);
-    const task = await taskService.update(id, {
+    const task = await taskService.update(id, userId, {
       title: body.title,
       description: body.description,
       priority: body.priority,
@@ -100,7 +105,8 @@ export async function requestDeleteTask(
 ): Promise<void> {
   try {
     const id = numericIdSchema.parse(req.params.id);
-    const result = await taskService.requestDelete(id);
+    const userId = req.authUser!.id;
+    const result = await taskService.requestDelete(id, userId);
     if (!result.ok || !result.task || !result.confirmationToken) {
       next(new AppError(404, result.error ?? "Task not found"));
       return;
@@ -129,8 +135,9 @@ export async function confirmDeleteTask(
 ): Promise<void> {
   try {
     const id = numericIdSchema.parse(req.params.id);
+    const userId = req.authUser!.id;
     const body = confirmDeleteSchema.parse(req.body);
-    const task = await taskService.confirmDelete(id, body.confirmationToken);
+    const task = await taskService.confirmDelete(id, userId, body.confirmationToken);
     res.json({ success: true, task });
   } catch (error) {
     if (error instanceof ZodError) {
@@ -148,9 +155,11 @@ export async function taskAssistantChat(
 ): Promise<void> {
   try {
     const body = taskAssistantChatSchema.parse(req.body);
+    const userId = req.authUser!.id;
     const result = await taskAssistantService.chat(
       body.message,
       body.history ?? [],
+      userId,
     );
     res.json({
       success: true,

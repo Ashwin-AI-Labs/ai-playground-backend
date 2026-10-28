@@ -1,10 +1,13 @@
 import { Router } from "express";
+import { authRouter } from "../modules/auth";
 import { chatRouter } from "../modules/chat";
 import { healthRouter } from "../modules/health";
+import { documentSummarizerRouter } from "../modules/document-summarizer";
 import { ragRouter } from "../modules/rag";
 import { researchRouter } from "../modules/research";
 import { semanticSearchRouter } from "../modules/semantic-search";
 import { taskAssistantRouter, tasksRouter } from "../modules/tasks";
+import { requireAuth } from "../middleware/require-auth";
 
 export const apiRouter = Router();
 
@@ -22,6 +25,15 @@ apiRouter.get("/", (_req, res) => {
         path: "/api/health/db",
         description: "PostgreSQL health check",
       },
+      // Auth
+      { method: "POST", path: "/api/auth/register", description: "Register a new account (sends OTP)" },
+      { method: "POST", path: "/api/auth/verify-email", description: "Verify email with OTP" },
+      { method: "POST", path: "/api/auth/resend-otp", description: "Resend verification OTP" },
+      { method: "POST", path: "/api/auth/login", description: "Login with email + password" },
+      { method: "POST", path: "/api/auth/refresh", description: "Refresh access token using cookie" },
+      { method: "POST", path: "/api/auth/logout", description: "Logout and clear refresh cookie" },
+      { method: "GET", path: "/api/auth/me", description: "Get current user profile (requires auth)" },
+      { method: "PATCH", path: "/api/auth/me", description: "Update display name (requires auth)" },
       {
         method: "POST",
         path: "/api/chat",
@@ -131,14 +143,41 @@ apiRouter.get("/", (_req, res) => {
         path: "/api/research/sessions/:id",
         description: "Delete a research session",
       },
+      {
+        method: "POST",
+        path: "/api/document-summarizer/summarize",
+        description: "Upload a document and generate a LangChain summary",
+      },
+      {
+        method: "GET",
+        path: "/api/document-summarizer/summaries",
+        description: "List saved document summaries",
+      },
+      {
+        method: "GET",
+        path: "/api/document-summarizer/summaries/:id",
+        description: "Get a saved document summary",
+      },
+      {
+        method: "DELETE",
+        path: "/api/document-summarizer/summaries/:id",
+        description: "Delete a document summary",
+      },
+      {
+        method: "GET",
+        path: "/api/document-summarizer/summaries/:id/export",
+        description: "Export a summary as Markdown",
+      },
     ],
   });
 });
 
 apiRouter.use("/health", healthRouter);
-apiRouter.use("/chat", chatRouter);
-apiRouter.use("/task-assistant", taskAssistantRouter);
-apiRouter.use("/tasks", tasksRouter);
-apiRouter.use("/semantic-search", semanticSearchRouter);
-apiRouter.use("/rag", ragRouter);
-apiRouter.use("/research", researchRouter);
+apiRouter.use("/auth", authRouter);
+apiRouter.use("/chat", requireAuth, chatRouter);
+apiRouter.use("/task-assistant", requireAuth, taskAssistantRouter);
+apiRouter.use("/tasks", requireAuth, tasksRouter);
+apiRouter.use("/semantic-search", requireAuth, semanticSearchRouter);
+apiRouter.use("/rag", requireAuth, ragRouter);
+apiRouter.use("/research", requireAuth, researchRouter);
+apiRouter.use("/document-summarizer", requireAuth, documentSummarizerRouter);

@@ -12,11 +12,13 @@ export async function askQuestion(
 ): Promise<void> {
   try {
     const body = askSchema.parse(req.body);
+    const userId = req.authUser!.id;
     const result = await ragService.ask({
       question: body.question,
       documentIds: body.documentIds,
       sessionId: body.sessionId,
       topK: body.topK,
+      userId,
     });
     res.json({
       success: true,
@@ -28,12 +30,13 @@ export async function askQuestion(
 }
 
 export async function listEligibleDocuments(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    const result = await listSearchDocuments({ limit: 100, offset: 0 });
+    const userId = req.authUser!.id;
+    const result = await listSearchDocuments({ limit: 100, offset: 0, userId });
     const documents = result.documents
       .filter((doc) => doc.status === "completed")
       .map((doc) => ({
@@ -65,7 +68,8 @@ export async function listSessions(
 ): Promise<void> {
   try {
     const query = listSessionsQuerySchema.parse(req.query);
-    const sessions = await ragService.listSessions(query.limit);
+    const userId = req.authUser!.id;
+    const sessions = await ragService.listSessions(userId, query.limit);
     res.json({ success: true, sessions });
   } catch (error) {
     next(error);
@@ -79,7 +83,8 @@ export async function getSession(
 ): Promise<void> {
   try {
     const id = numericIdSchema.parse(req.params.id);
-    const detail = await ragService.getSession(id);
+    const userId = req.authUser!.id;
+    const detail = await ragService.getSession(id, userId);
     res.json({ success: true, ...detail });
   } catch (error) {
     if (error instanceof ZodError) {
@@ -97,7 +102,8 @@ export async function deleteSession(
 ): Promise<void> {
   try {
     const id = numericIdSchema.parse(req.params.id);
-    await ragService.deleteSession(id);
+    const userId = req.authUser!.id;
+    await ragService.deleteSession(id, userId);
     res.json({ success: true });
   } catch (error) {
     if (error instanceof ZodError) {

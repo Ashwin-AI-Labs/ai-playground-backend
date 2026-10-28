@@ -73,24 +73,26 @@ function mapSession(row: SessionRow): ResearchSessionRecord {
 export async function createSession(input: {
   title: string;
   question: string;
+  userId: string;
 }): Promise<ResearchSessionRecord> {
   const result = await pool.query<SessionRow>(
     `
-      INSERT INTO research_sessions (title, question, status)
-      VALUES ($1, $2, 'running')
+      INSERT INTO research_sessions (title, question, status, user_id)
+      VALUES ($1, $2, 'running', $3)
       RETURNING *
     `,
-    [input.title.slice(0, 120), input.question],
+    [input.title.slice(0, 120), input.question, input.userId],
   );
   return mapSession(result.rows[0]);
 }
 
 export async function getSessionById(
   sessionId: string,
+  userId: string,
 ): Promise<ResearchSessionRecord | null> {
   const result = await pool.query<SessionRow>(
-    `SELECT * FROM research_sessions WHERE id = $1`,
-    [sessionId],
+    `SELECT * FROM research_sessions WHERE id = $1 AND user_id = $2`,
+    [sessionId, userId],
   );
   return result.rows[0] ? mapSession(result.rows[0]) : null;
 }
@@ -221,18 +223,21 @@ export async function listSources(
 export async function listSessions(input: {
   limit: number;
   offset: number;
+  userId: string;
 }): Promise<{ sessions: ResearchSessionRecord[]; total: number }> {
   const count = await pool.query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM research_sessions`,
+    `SELECT COUNT(*)::text AS count FROM research_sessions WHERE user_id = $1`,
+    [input.userId],
   );
   const result = await pool.query<SessionRow>(
     `
       SELECT *
       FROM research_sessions
+      WHERE user_id = $1
       ORDER BY updated_at DESC, id DESC
-      LIMIT $1 OFFSET $2
+      LIMIT $2 OFFSET $3
     `,
-    [input.limit, input.offset],
+    [input.userId, input.limit, input.offset],
   );
   return {
     sessions: result.rows.map(mapSession),
@@ -240,10 +245,13 @@ export async function listSessions(input: {
   };
 }
 
-export async function deleteSession(sessionId: string): Promise<boolean> {
+export async function deleteSession(
+  sessionId: string,
+  userId: string,
+): Promise<boolean> {
   const result = await pool.query(
-    `DELETE FROM research_sessions WHERE id = $1`,
-    [sessionId],
+    `DELETE FROM research_sessions WHERE id = $1 AND user_id = $2`,
+    [sessionId, userId],
   );
   return (result.rowCount ?? 0) > 0;
 }

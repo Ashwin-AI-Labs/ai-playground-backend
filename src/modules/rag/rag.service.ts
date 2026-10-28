@@ -76,6 +76,7 @@ export function createRagService(deps?: {
       documentIds: string[];
       sessionId?: string | null;
       topK?: number;
+      userId: string;
     }): Promise<RagAskResult> {
       const question = input.question.trim();
       if (!question) {
@@ -88,7 +89,7 @@ export function createRagService(deps?: {
 
       let session =
         input.sessionId != null
-          ? await repository.getSessionById(input.sessionId)
+          ? await repository.getSessionById(input.sessionId, input.userId)
           : null;
 
       if (input.sessionId && !session) {
@@ -96,7 +97,7 @@ export function createRagService(deps?: {
       }
 
       if (!session) {
-        session = await repository.createSession(deriveTitle(question));
+        session = await repository.createSession(deriveTitle(question), input.userId);
       }
 
       await repository.addMessage({
@@ -107,6 +108,7 @@ export function createRagService(deps?: {
 
       const eligibleCount = await repository.countCompletedDocuments(
         documentIds.length > 0 ? documentIds : undefined,
+        input.userId,
       );
 
       if (eligibleCount === 0) {
@@ -137,6 +139,7 @@ export function createRagService(deps?: {
         limit: topK,
         documentIds: documentIds.length > 0 ? documentIds : undefined,
         minSimilarity,
+        userId: input.userId,
       });
 
       let evidence: RetrievedEvidence[] = hits.map((hit, index) => ({
@@ -237,13 +240,13 @@ export function createRagService(deps?: {
       };
     },
 
-    async listSessions(limit: number): Promise<RagSessionSummaryDto[]> {
-      const sessions = await repository.listSessions(limit);
+    async listSessions(userId: string, limit: number): Promise<RagSessionSummaryDto[]> {
+      const sessions = await repository.listSessions(userId, limit);
       return sessions.map(toSessionSummary);
     },
 
-    async getSession(sessionId: string): Promise<RagSessionDetailDto> {
-      const session = await repository.getSessionById(sessionId);
+    async getSession(sessionId: string, userId: string): Promise<RagSessionDetailDto> {
+      const session = await repository.getSessionById(sessionId, userId);
       if (!session) {
         throw new AppError(404, "RAG session not found");
       }
@@ -277,8 +280,8 @@ export function createRagService(deps?: {
       };
     },
 
-    async deleteSession(sessionId: string): Promise<void> {
-      const deleted = await repository.deleteSession(sessionId);
+    async deleteSession(sessionId: string, userId: string): Promise<void> {
+      const deleted = await repository.deleteSession(sessionId, userId);
       if (!deleted) {
         throw new AppError(404, "RAG session not found");
       }

@@ -37,29 +37,29 @@ export function createTaskService() {
       return toTaskDto(task);
     },
 
-    async getById(taskId: string) {
-      const task = await getTaskById(taskId);
+    async getById(taskId: string, userId: string) {
+      const task = await getTaskById(taskId, userId);
       if (!task) {
         throw new AppError(404, "Task not found");
       }
       return toTaskDto(task);
     },
 
-    async list(filter: ListTasksFilter = {}) {
-      const tasks = await listTasks(filter);
+    async list(userId: string, filter: ListTasksFilter = {}) {
+      const tasks = await listTasks(userId, filter);
       return tasks.map(toTaskDto);
     },
 
-    async update(taskId: string, input: UpdateTaskInput) {
-      const task = await updateTask(taskId, input);
+    async update(taskId: string, userId: string, input: UpdateTaskInput) {
+      const task = await updateTask(taskId, userId, input);
       if (!task) {
         throw new AppError(404, "Task not found");
       }
       return toTaskDto(task);
     },
 
-    async requestDelete(taskId: string) {
-      const task = await getTaskById(taskId);
+    async requestDelete(taskId: string, userId: string) {
+      const task = await getTaskById(taskId, userId);
       if (!task) {
         return {
           ok: false as const,
@@ -79,7 +79,7 @@ export function createTaskService() {
       };
     },
 
-    async confirmDelete(taskId: string, confirmationToken: string) {
+    async confirmDelete(taskId: string, userId: string, confirmationToken: string) {
       const verification = verifyDeleteConfirmationToken(
         confirmationToken,
         taskId,
@@ -88,7 +88,7 @@ export function createTaskService() {
         throw new AppError(400, verification.reason);
       }
 
-      const deleted = await deleteTask(taskId);
+      const deleted = await deleteTask(taskId, userId);
       if (!deleted) {
         throw new AppError(404, "Task not found");
       }

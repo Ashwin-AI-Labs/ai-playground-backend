@@ -140,6 +140,7 @@ function parseArgs(raw: string): unknown {
 export async function executeTaskTool(
   name: string,
   rawArguments: string,
+  userId: string,
 ): Promise<{ toolResult: Record<string, unknown>; action: ToolActionResult }> {
   switch (name) {
     case "create_task": {
@@ -149,6 +150,7 @@ export async function executeTaskTool(
         description: args.description,
         priority: args.priority,
         dueDate: args.dueDate ? new Date(args.dueDate) : null,
+        userId,
       });
       return {
         toolResult: { ok: true, task },
@@ -162,7 +164,7 @@ export async function executeTaskTool(
     }
     case "list_tasks": {
       const args = listTasksArgsSchema.parse(parseArgs(rawArguments));
-      const tasks = await taskService.list({
+      const tasks = await taskService.list(userId, {
         status: args.status,
         priority: args.priority,
         limit: args.limit,
@@ -180,7 +182,7 @@ export async function executeTaskTool(
     case "update_task": {
       const args = updateTaskArgsSchema.parse(parseArgs(rawArguments));
       try {
-        const task = await taskService.update(args.taskId, {
+        const task = await taskService.update(args.taskId, userId, {
           title: args.title,
           description: args.description,
           priority: args.priority,
@@ -216,7 +218,7 @@ export async function executeTaskTool(
     }
     case "delete_task": {
       const args = deleteTaskArgsSchema.parse(parseArgs(rawArguments));
-      const result = await taskService.requestDelete(args.taskId);
+      const result = await taskService.requestDelete(args.taskId, userId);
       if (!result.ok) {
         return {
           toolResult: { ok: false, error: result.error },

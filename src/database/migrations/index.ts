@@ -8,6 +8,8 @@ import { migration as migration0007 } from "./0007_add_chunk_page_metadata";
 import { migration as migration0008 } from "./0008_create_rag_sessions";
 import { migration as migration0009 } from "./0009_create_research_sessions";
 import { migration as migration0010 } from "./0010_add_research_search_queries";
+import { migration as migration0011 } from "./0011_create_document_summaries";
+import { migration as migration0012 } from "./0012_create_users_and_ownership";
 import type { Migration } from "../types";
 
 /**
@@ -26,4 +28,6 @@ export const migrations: Migration[] = [
   migration0008,
   migration0009,
   migration0010,
+  migration0011,
+  migration0012,
 ];

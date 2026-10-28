@@ -49,16 +49,17 @@ function mapDocument(row: DocumentRow): SearchDocumentRecord {
 
 export async function findCompletedByContentHash(
   contentHash: string,
+  userId: string,
 ): Promise<SearchDocumentRecord | null> {
   const result = await pool.query<DocumentRow>(
     `
       SELECT *
       FROM search_documents
-      WHERE content_hash = $1 AND status = 'completed'
+      WHERE content_hash = $1 AND status = 'completed' AND user_id = $2
       ORDER BY id ASC
       LIMIT 1
     `,
-    [contentHash],
+    [contentHash, userId],
   );
   return result.rows[0] ? mapDocument(result.rows[0]) : null;
 }
@@ -70,6 +71,7 @@ export async function createDocument(input: {
   fileSizeBytes: number;
   contentHash: string;
   status: DocumentStatus;
+  userId: string;
 }): Promise<SearchDocumentRecord> {
   const result = await pool.query<DocumentRow>(
     `
@@ -79,9 +81,10 @@ export async function createDocument(input: {
         mime_type,
         file_size_bytes,
         content_hash,
-        status
+        status,
+        user_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `,
     [
@@ -91,6 +94,7 @@ export async function createDocument(input: {
       input.fileSizeBytes,
       input.contentHash,
       input.status,
+      input.userId,
     ],
   );
   return mapDocument(result.rows[0]);
@@ -175,20 +179,24 @@ export async function insertChunks(
   }
 }
 
-export async function deleteDocument(documentId: string): Promise<boolean> {
+export async function deleteDocument(
+  documentId: string,
+  userId: string,
+): Promise<boolean> {
   const result = await pool.query(
-    `DELETE FROM search_documents WHERE id = $1`,
-    [documentId],
+    `DELETE FROM search_documents WHERE id = $1 AND user_id = $2`,
+    [documentId, userId],
   );
   return (result.rowCount ?? 0) > 0;
 }
 
 export async function getDocumentById(
   documentId: string,
+  userId: string,
 ): Promise<SearchDocumentRecord | null> {
   const result = await pool.query<DocumentRow>(
-    `SELECT * FROM search_documents WHERE id = $1`,
-    [documentId],
+    `SELECT * FROM search_documents WHERE id = $1 AND user_id = $2`,
+    [documentId, userId],
   );
   return result.rows[0] ? mapDocument(result.rows[0]) : null;
 }
@@ -196,18 +204,27 @@ export async function getDocumentById(
 export async function listDocuments(input: {
   limit: number;
   offset: number;
+  userId?: string;
 }): Promise<{ documents: SearchDocumentRecord[]; total: number }> {
+  const where = input.userId ? `WHERE user_id = $3` : "";
+  const params: unknown[] = [input.limit, input.offset];
+  if (input.userId) params.push(input.userId);
+
   const countResult = await pool.query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM search_documents`,
+    input.userId
+      ? `SELECT COUNT(*)::text AS count FROM search_documents WHERE user_id = $1`
+      : `SELECT COUNT(*)::text AS count FROM search_documents`,
+    input.userId ? [input.userId] : [],
   );
   const result = await pool.query<DocumentRow>(
     `
       SELECT *
       FROM search_documents
+      ${where}
       ORDER BY created_at DESC, id DESC
       LIMIT $1 OFFSET $2
     `,
-    [input.limit, input.offset],
+    params,
   );
 
   return {
@@ -216,9 +233,12 @@ export async function listDocuments(input: {
   };
 }
 
-export async function countCompletedDocuments(): Promise<number> {
+export async function countCompletedDocuments(userId?: string): Promise<number> {
   const result = await pool.query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM search_documents WHERE status = 'completed'`,
+    userId
+      ? `SELECT COUNT(*)::text AS count FROM search_documents WHERE status = 'completed' AND user_id = $1`
+      : `SELECT COUNT(*)::text AS count FROM search_documents WHERE status = 'completed'`,
+    userId ? [userId] : [],
   );
   return Number(result.rows[0]?.count ?? 0);
 }

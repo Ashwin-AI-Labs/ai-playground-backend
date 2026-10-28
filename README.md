@@ -56,6 +56,7 @@ AI-PROJECT-OCT-2026/
 | `modules/semantic-search` | `semanticSearchRouter`, `semanticSearchService` | Document ingest, embeddings, similarity search |
 | `modules/rag` | `ragRouter`, `ragService` | Retrieval-augmented Q&A, citations, sessions |
 | `modules/research` | `researchRouter`, `researchService` | Web research, citations, sessions |
+| `modules/document-summarizer` | `documentSummarizerRouter`, `documentSummarizerService` | LangChain.js document summarization |
 | `modules/health` | `healthRouter` | API and DB health checks |
 | `services/ai` | `getAiProviderBundle`, provider types | OpenAI / Anthropic clients — modules never instantiate SDKs directly |
 | `services/web-search` | `getWebSearchProvider` | Tavily web search adapter |
@@ -118,6 +119,22 @@ Live web research with validated citations. Details: `src/modules/research/READM
 - **Config:** `TAVILY_API_KEY`, `RESEARCH_MAX_RESULTS`, `RESEARCH_MAX_FOLLOWUP_QUERIES`, `RESEARCH_FETCH_TIMEOUT_MS`, `RESEARCH_MAX_PAGE_BYTES`, `RESEARCH_MODEL`
 - **UI:** `/features/research-agent`
 
+### Project 6 — AI Document Summarizer (LangChain.js)
+
+Real LangChain.js pipeline (not a direct OpenAI SDK wrapper). Details: `src/modules/document-summarizer/README.md`.
+
+- **Packages:** `@langchain/core`, `@langchain/openai`, `@langchain/textsplitters`
+- **Pipeline:** extract → `Document` → `RecursiveCharacterTextSplitter` → `ChatPromptTemplate` + `RunnableSequence` (`direct` / `map_reduce` / `refine`) → Zod-validated structured summary
+- **Migration:** `0011_create_document_summaries`
+- **Endpoints:**
+  - `POST /api/document-summarizer/summarize`
+  - `GET /api/document-summarizer/summaries`
+  - `GET /api/document-summarizer/summaries/:id`
+  - `DELETE /api/document-summarizer/summaries/:id`
+  - `GET /api/document-summarizer/summaries/:id/export`
+- **Config:** `SUMMARIZER_*` (optional; uses `OPENAI_API_KEY` / `OPENAI_MODEL` by default)
+- **UI:** `/features/summarizer`
+
 ### How to add a backend feature
 
 1. Create `src/modules/<name>/` with routes, controller, service, schemas, types, and `index.ts` (export only the public surface)
@@ -173,6 +190,7 @@ Preserve local credentials in `.env`. Never commit `.env` or real API keys.
 | `RAG_*` | PDF RAG generation / retrieval tunables |
 | `TAVILY_API_KEY` | Research Assistant web search (required for live search) |
 | `RESEARCH_*` | Research result/fetch limits and optional model override |
+| `SUMMARIZER_*` | Document summarizer chunk/concurrency/timeout overrides |
 
 Compose injects `DATABASE_URL` using the `postgres` service hostname. Do not bake secrets into images.
 

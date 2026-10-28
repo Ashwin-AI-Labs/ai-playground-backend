@@ -23,6 +23,7 @@ export async function uploadDocument(
       buffer: file.buffer,
       originalFilename: file.originalname || "upload",
       mimeType: file.mimetype || "application/octet-stream",
+      userId: req.authUser!.id,
     });
 
     const statusCode = document.duplicateOf ? 200 : 201;
@@ -46,7 +47,10 @@ export async function listDocuments(
 ): Promise<void> {
   try {
     const query = listDocumentsQuerySchema.parse(req.query);
-    const result = await semanticSearchService.listDocuments(query);
+    const result = await semanticSearchService.listDocuments({
+      ...query,
+      userId: req.authUser!.id,
+    });
     res.json({ success: true, ...result });
   } catch (error) {
     next(error);
@@ -60,7 +64,7 @@ export async function getDocument(
 ): Promise<void> {
   try {
     const id = numericIdSchema.parse(req.params.id);
-    const document = await semanticSearchService.getDocument(id);
+    const document = await semanticSearchService.getDocument(id, req.authUser!.id);
     res.json({ success: true, document });
   } catch (error) {
     if (error instanceof ZodError) {
@@ -78,7 +82,7 @@ export async function deleteDocument(
 ): Promise<void> {
   try {
     const id = numericIdSchema.parse(req.params.id);
-    await semanticSearchService.deleteDocument(id);
+    await semanticSearchService.deleteDocument(id, req.authUser!.id);
     res.json({ success: true });
   } catch (error) {
     if (error instanceof ZodError) {
@@ -100,6 +104,7 @@ export async function searchDocuments(
       query: body.query,
       limit: body.limit,
       documentIds: body.documentIds,
+      userId: req.authUser!.id,
     });
     res.json({
       success: true,

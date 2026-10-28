@@ -1,3 +1,4 @@
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import { apiRouter } from "./api/router";
@@ -15,6 +16,7 @@ export function createApp() {
     }),
   );
   app.use(express.json());
+  app.use(cookieParser());
 
   app.get("/", (_req, res) => {
     res.json({

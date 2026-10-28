@@ -16,11 +16,13 @@ export async function runResearch(
 ): Promise<void> {
   try {
     const body = researchRunSchema.parse(req.body);
+    const userId = req.authUser!.id;
     const result = await researchService.run({
       question: body.question,
       maxResults: body.maxResults,
       recencyDays: body.recencyDays,
       includeDomains: body.includeDomains,
+      userId,
     });
     res.status(201).json({ success: true, data: result });
   } catch (error) {
@@ -52,7 +54,8 @@ export async function listSessions(
 ): Promise<void> {
   try {
     const query = listSessionsQuerySchema.parse(req.query);
-    const result = await researchService.listSessions(query);
+    const userId = req.authUser!.id;
+    const result = await researchService.listSessions({ ...query, userId });
     res.json({ success: true, ...result });
   } catch (error) {
     next(error);
@@ -66,7 +69,8 @@ export async function getSession(
 ): Promise<void> {
   try {
     const id = numericIdSchema.parse(req.params.id);
-    const data = await researchService.getSession(id);
+    const userId = req.authUser!.id;
+    const data = await researchService.getSession(id, userId);
     res.json({ success: true, data });
   } catch (error) {
     if (error instanceof ZodError) {
@@ -84,7 +88,8 @@ export async function deleteSession(
 ): Promise<void> {
   try {
     const id = numericIdSchema.parse(req.params.id);
-    await researchService.deleteSession(id);
+    const userId = req.authUser!.id;
+    await researchService.deleteSession(id, userId);
     res.json({ success: true });
   } catch (error) {
     if (error instanceof ZodError) {

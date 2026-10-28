@@ -75,6 +75,7 @@ describe("semantic search service", () => {
       buffer: Buffer.from("Our employees can work remotely.", "utf8"),
       originalFilename: "policy.txt",
       mimeType: "text/plain",
+      userId: "user-1",
     });
 
     expect(result.duplicateOf).toBe(true);
@@ -123,6 +124,7 @@ describe("semantic search service", () => {
       ),
       originalFilename: "policy.txt",
       mimeType: "text/plain",
+      userId: "user-1",
     });
 
     expect(result.status).toBe("completed");
@@ -171,6 +173,7 @@ describe("semantic search service", () => {
         buffer: Buffer.from("Remote work policy text for indexing.", "utf8"),
         originalFilename: "policy.txt",
         mimeType: "text/plain",
+        userId: "user-1",
       }),
     ).rejects.toThrow(/boom|failed/i);
 
@@ -187,6 +190,7 @@ describe("semantic search service", () => {
       query: "remote work",
       limit: 5,
       documentIds: [],
+      userId: "user-1",
     });
     expect(result.results).toEqual([]);
     expect(searchMock.searchSimilarChunks).not.toHaveBeenCalled();
@@ -215,6 +219,7 @@ describe("semantic search service", () => {
       query: "What is the company's work-from-home policy?",
       limit: 5,
       documentIds: ["7"],
+      userId: "user-1",
     });
 
     expect(result.results).toHaveLength(1);
@@ -231,7 +236,7 @@ describe("semantic search service", () => {
   it("deletes documents", async () => {
     repositoryMock.deleteDocument.mockResolvedValue(true);
     const service = createSemanticSearchService(mockEmbeddingProvider());
-    await service.deleteDocument("7");
-    expect(repositoryMock.deleteDocument).toHaveBeenCalledWith("7");
+    await service.deleteDocument("7", "user-1");
+    expect(repositoryMock.deleteDocument).toHaveBeenCalledWith("7", "user-1");
   });
 });

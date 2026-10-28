@@ -50,12 +50,15 @@ function mapMessage(row: MessageRow): MessageRecord {
   };
 }
 
-export async function createConversation(title: string): Promise<ConversationRecord> {
+export async function createConversation(
+  title: string,
+  userId: string,
+): Promise<ConversationRecord> {
   const result = await pool.query<ConversationRow>(
-    `INSERT INTO conversations (title)
-     VALUES ($1)
+    `INSERT INTO conversations (title, user_id)
+     VALUES ($1, $2)
      RETURNING id, title, created_at, updated_at`,
-    [title],
+    [title, userId],
   );
 
   return mapConversation(result.rows[0]);
@@ -63,48 +66,57 @@ export async function createConversation(title: string): Promise<ConversationRec
 
 export async function getConversationById(
   conversationId: string,
+  userId: string,
 ): Promise<ConversationRecord | null> {
   const result = await pool.query<ConversationRow>(
     `SELECT id, title, created_at, updated_at
      FROM conversations
-     WHERE id = $1`,
-    [conversationId],
+     WHERE id = $1 AND user_id = $2`,
+    [conversationId, userId],
   );
 
   const row = result.rows[0];
   return row ? mapConversation(row) : null;
 }
 
-export async function listConversations(limit = 50): Promise<ConversationRecord[]> {
+export async function listConversations(
+  userId: string,
+  limit = 50,
+): Promise<ConversationRecord[]> {
   const result = await pool.query<ConversationRow>(
     `SELECT id, title, created_at, updated_at
      FROM conversations
+     WHERE user_id = $1
      ORDER BY updated_at DESC
-     LIMIT $1`,
-    [limit],
+     LIMIT $2`,
+    [userId, limit],
   );
 
   return result.rows.map(mapConversation);
 }
 
-export async function touchConversation(conversationId: string): Promise<void> {
+export async function touchConversation(
+  conversationId: string,
+  userId: string,
+): Promise<void> {
   await pool.query(
     `UPDATE conversations
      SET updated_at = NOW()
-     WHERE id = $1`,
-    [conversationId],
+     WHERE id = $1 AND user_id = $2`,
+    [conversationId, userId],
   );
 }
 
 export async function updateConversationTitle(
   conversationId: string,
   title: string,
+  userId: string,
 ): Promise<void> {
   await pool.query(
     `UPDATE conversations
      SET title = $2, updated_at = NOW()
-     WHERE id = $1`,
-    [conversationId, title],
+     WHERE id = $1 AND user_id = $3`,
+    [conversationId, title, userId],
   );
 }
 
