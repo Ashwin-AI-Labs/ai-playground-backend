@@ -3,16 +3,25 @@ import { AppError } from "../../middleware/error-handler";
 
 export type SupportedExtension = "pdf" | "txt" | "md";
 
+export type ExtractedPage = {
+  pageNumber: number;
+  text: string;
+};
+
 export type ExtractedDocument = {
   text: string;
   extension: SupportedExtension;
   mimeType: string;
   contentHash: string;
+  /** PDF page texts when available; empty for TXT/Markdown. */
+  pages: ExtractedPage[];
 };
 
 export type TextChunk = {
   index: number;
   content: string;
+  pageStart: number | null;
+  pageEnd: number | null;
 };
 
 const EXTENSION_MIME: Record<SupportedExtension, string[]> = {
@@ -90,12 +99,29 @@ export function hashContent(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
 }
 
-async function extractPdfText(buffer: Buffer): Promise<string> {
+async function extractPdfPages(buffer: Buffer): Promise<{
+  text: string;
+  pages: ExtractedPage[];
+}> {
   const { PDFParse } = await import("pdf-parse");
   const parser = new PDFParse({ data: buffer });
   try {
     const result = await parser.getText();
-    return typeof result?.text === "string" ? result.text : "";
+    const pages: ExtractedPage[] = (result.pages ?? [])
+      .map((page) => ({
+        pageNumber: page.num,
+        text: normalizeExtractedText(page.text ?? ""),
+      }))
+      .filter((page) => page.text.length > 0);
+
+    const text =
+      pages.length > 0
+        ? pages.map((page) => page.text).join("\n\n")
+        : normalizeExtractedText(
+            typeof result?.text === "string" ? result.text : "",
+          );
+
+    return { text, pages };
   } finally {
     await parser.destroy().catch(() => undefined);
   }
@@ -118,12 +144,17 @@ export async function extractDocumentText(input: {
     maxBytes: input.maxBytes,
   });
 
-  let rawText = "";
+  let text = "";
+  let pages: ExtractedPage[] = [];
+
   try {
     if (extension === "pdf") {
-      rawText = await extractPdfText(input.buffer);
+      const extracted = await extractPdfPages(input.buffer);
+      text = extracted.text;
+      pages = extracted.pages;
     } else {
-      rawText = extractPlainText(input.buffer);
+      text = normalizeExtractedText(extractPlainText(input.buffer));
+      pages = [];
     }
   } catch (error) {
     if (error instanceof AppError) {
@@ -135,7 +166,7 @@ export async function extractDocumentText(input: {
     );
   }
 
-  const text = normalizeExtractedText(rawText);
+  text = normalizeExtractedText(text);
   if (!text) {
     throw new AppError(
       400,
@@ -148,7 +179,97 @@ export async function extractDocumentText(input: {
     extension,
     mimeType: EXTENSION_MIME[extension][0],
     contentHash: hashContent(text),
+    pages,
   };
+}
+
+/**
+ * Word-based chunking approximating tokens (1 word ≈ 1 token).
+ * Prefer paragraph/sentence boundaries when they fall near the target size.
+ *
+ * Limitations:
+ * - Not a true tokenizer; non-English scripts and punctuation inflate counts.
+ * - Very long words are kept intact and may exceed the target size slightly.
+ */
+type WordToken = {
+  word: string;
+  pageNumber: number | null;
+};
+
+function chunkWordTokens(
+  tokens: WordToken[],
+  options: { chunkSize: number; overlap: number },
+): TextChunk[] {
+  const { chunkSize, overlap } = options;
+  if (chunkSize < 1) {
+    throw new AppError(500, "chunkSize must be positive");
+  }
+  if (overlap < 0 || overlap >= chunkSize) {
+    throw new AppError(500, "overlap must be >= 0 and < chunkSize");
+  }
+  if (tokens.length === 0) {
+    return [];
+  }
+
+  const chunks: TextChunk[] = [];
+  let start = 0;
+  let index = 0;
+
+  while (start < tokens.length) {
+    let end = Math.min(start + chunkSize, tokens.length);
+
+    if (end < tokens.length) {
+      const searchFrom = Math.max(start + Math.floor(chunkSize * 0.8), start + 1);
+      const window = tokens.slice(searchFrom, end);
+      let boundaryOffset = -1;
+      for (let i = window.length - 1; i >= 0; i -= 1) {
+        const token = window[i].word;
+        if (
+          token.endsWith(".") ||
+          token.endsWith("!") ||
+          token.endsWith("?") ||
+          token.endsWith(":")
+        ) {
+          boundaryOffset = i;
+          break;
+        }
+      }
+      if (boundaryOffset >= 0) {
+        end = searchFrom + boundaryOffset + 1;
+      }
+    }
+
+    const slice = tokens.slice(start, end);
+    const content = slice
+      .map((token) => token.word)
+      .join(" ")
+      .trim();
+    if (content) {
+      const pageNumbers = slice
+        .map((token) => token.pageNumber)
+        .filter((value): value is number => value !== null);
+      chunks.push({
+        index,
+        content,
+        pageStart: pageNumbers.length > 0 ? Math.min(...pageNumbers) : null,
+        pageEnd: pageNumbers.length > 0 ? Math.max(...pageNumbers) : null,
+      });
+      index += 1;
+    }
+
+    if (end >= tokens.length) {
+      break;
+    }
+
+    const nextStart = end - overlap;
+    start = nextStart <= start ? end : nextStart;
+  }
+
+  if (chunks.length === 0) {
+    throw new AppError(400, "Document produced no searchable chunks");
+  }
+
+  return chunks;
 }
 
 /**
@@ -163,65 +284,33 @@ export function chunkText(
   text: string,
   options: { chunkSize: number; overlap: number },
 ): TextChunk[] {
-  const { chunkSize, overlap } = options;
-  if (chunkSize < 1) {
-    throw new AppError(500, "chunkSize must be positive");
-  }
-  if (overlap < 0 || overlap >= chunkSize) {
-    throw new AppError(500, "overlap must be >= 0 and < chunkSize");
-  }
-
   const normalized = normalizeExtractedText(text);
-  if (!normalized) {
-    return [];
-  }
-
   const words = normalized.split(/\s+/).filter(Boolean);
-  if (words.length === 0) {
-    return [];
+  return chunkWordTokens(
+    words.map((word) => ({ word, pageNumber: null })),
+    options,
+  );
+}
+
+/**
+ * Chunk page-aware PDF text so each chunk can cite page_start/page_end.
+ * Falls back to plain chunking when pages are empty.
+ */
+export function chunkExtractedDocument(
+  document: ExtractedDocument,
+  options: { chunkSize: number; overlap: number },
+): TextChunk[] {
+  if (document.pages.length === 0) {
+    return chunkText(document.text, options);
   }
 
-  const chunks: TextChunk[] = [];
-  let start = 0;
-  let index = 0;
-
-  while (start < words.length) {
-    let end = Math.min(start + chunkSize, words.length);
-
-    // Prefer ending near a paragraph or sentence boundary within the last 20%.
-    if (end < words.length) {
-      const searchFrom = Math.max(start + Math.floor(chunkSize * 0.8), start + 1);
-      const window = words.slice(searchFrom, end);
-      let boundaryOffset = -1;
-      for (let i = window.length - 1; i >= 0; i -= 1) {
-        const token = window[i];
-        if (token.endsWith(".") || token.endsWith("!") || token.endsWith("?") || token.endsWith(":")) {
-          boundaryOffset = i;
-          break;
-        }
-      }
-      if (boundaryOffset >= 0) {
-        end = searchFrom + boundaryOffset + 1;
-      }
+  const tokens: WordToken[] = [];
+  for (const page of document.pages) {
+    const words = page.text.split(/\s+/).filter(Boolean);
+    for (const word of words) {
+      tokens.push({ word, pageNumber: page.pageNumber });
     }
-
-    const content = words.slice(start, end).join(" ").trim();
-    if (content) {
-      chunks.push({ index, content });
-      index += 1;
-    }
-
-    if (end >= words.length) {
-      break;
-    }
-
-    const nextStart = end - overlap;
-    start = nextStart <= start ? end : nextStart;
   }
 
-  if (chunks.length === 0) {
-    throw new AppError(400, "Document produced no searchable chunks");
-  }
-
-  return chunks;
+  return chunkWordTokens(tokens, options);
 }

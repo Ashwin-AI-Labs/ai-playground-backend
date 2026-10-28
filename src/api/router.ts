@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { chatRouter } from "../modules/chat";
 import { healthRouter } from "../modules/health";
+import { ragRouter } from "../modules/rag";
 import { semanticSearchRouter } from "../modules/semantic-search";
 import { taskAssistantRouter, tasksRouter } from "../modules/tasks";
 
@@ -79,6 +80,31 @@ apiRouter.get("/", (_req, res) => {
         path: "/api/semantic-search/query",
         description: "Semantic similarity search over indexed passages",
       },
+      {
+        method: "POST",
+        path: "/api/rag/ask",
+        description: "Ask a question with retrieval-augmented generation",
+      },
+      {
+        method: "GET",
+        path: "/api/rag/documents",
+        description: "List completed documents eligible for RAG",
+      },
+      {
+        method: "GET",
+        path: "/api/rag/sessions",
+        description: "List recent RAG sessions",
+      },
+      {
+        method: "GET",
+        path: "/api/rag/sessions/:id",
+        description: "Get a RAG session and message history",
+      },
+      {
+        method: "DELETE",
+        path: "/api/rag/sessions/:id",
+        description: "Delete a RAG session",
+      },
     ],
   });
 });
@@ -88,3 +114,4 @@ apiRouter.use("/chat", chatRouter);
 apiRouter.use("/task-assistant", taskAssistantRouter);
 apiRouter.use("/tasks", tasksRouter);
 apiRouter.use("/semantic-search", semanticSearchRouter);
+apiRouter.use("/rag", ragRouter);

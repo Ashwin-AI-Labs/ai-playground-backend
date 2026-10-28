@@ -50,6 +50,7 @@ AI-PROJECT-OCT-2026/
 | `modules/chat` | `chatRouter`, `chatService` | Conversations, messages, chat responses |
 | `modules/tasks` | `tasksRouter`, `taskAssistantRouter`, `taskService`, `taskAssistantService` | Task CRUD, tool calling, delete confirmation |
 | `modules/semantic-search` | `semanticSearchRouter`, `semanticSearchService` | Document ingest, embeddings, similarity search |
+| `modules/rag` | `ragRouter`, `ragService` | Retrieval-augmented Q&A, citations, sessions |
 | `modules/health` | `healthRouter` | API and DB health checks |
 | `services/ai` | `getAiProviderBundle`, provider types | OpenAI / Anthropic clients — modules never instantiate SDKs directly |
 
@@ -77,6 +78,21 @@ AI-PROJECT-OCT-2026/
   - `POST /api/semantic-search/query`
 
 Duplicate identical content (SHA-256) returns the existing completed document without re-embedding.
+
+### Project 4 — PDF Question Answering (RAG)
+
+Reuses Project 3 tables, embeddings, and pgvector retrieval. Adds:
+
+- **Migrations:** `0007_add_chunk_page_metadata` (`page_start` / `page_end` on chunks), `0008_create_rag_sessions` (sessions, messages, citation snapshots)
+- **Pipeline:** embed question → retrieve top-K completed chunks (optional document filter + similarity threshold) → bound context → LLM JSON answer → **backend citation validation**
+- **Page numbers:** PDF page-level extraction via `pdf-parse`; TXT/Markdown cite without fake pages; older chunks may show page unavailable until re-index
+- **Endpoints:**
+  - `POST /api/rag/ask`
+  - `GET /api/rag/documents`
+  - `GET /api/rag/sessions`
+  - `GET /api/rag/sessions/:id`
+  - `DELETE /api/rag/sessions/:id`
+- **Config:** `RAG_MODEL`, `RAG_DEFAULT_TOP_K`, `RAG_SIMILARITY_THRESHOLD` (default `0.22`, not a calibrated confidence), `RAG_MAX_CONTEXT_CHARS`
 
 ### How to add a backend feature
 
@@ -218,7 +234,7 @@ Migrations are **not** auto-applied by the API process on every request/startup.
 
 1. Configure `.env`
 2. `docker compose up --build -d`
-3. The `migrate` service applies `0001` → `0006`
+3. The `migrate` service applies `0001` → `0008`
 4. Confirm with `docker compose exec backend npm run db:migrate:status`
 
 ### Existing database

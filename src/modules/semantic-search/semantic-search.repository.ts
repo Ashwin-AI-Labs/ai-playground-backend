@@ -127,7 +127,13 @@ export async function updateDocumentStatus(
 
 export async function insertChunks(
   documentId: string,
-  chunks: Array<{ index: number; content: string; embedding: number[] }>,
+  chunks: Array<{
+    index: number;
+    content: string;
+    embedding: number[];
+    pageStart?: number | null;
+    pageEnd?: number | null;
+  }>,
 ): Promise<void> {
   const client = await pool.connect();
   try {
@@ -143,15 +149,19 @@ export async function insertChunks(
             document_id,
             chunk_index,
             content,
-            embedding
+            embedding,
+            page_start,
+            page_end
           )
-          VALUES ($1, $2, $3, $4::vector)
+          VALUES ($1, $2, $3, $4::vector, $5, $6)
         `,
         [
           documentId,
           chunk.index,
           chunk.content,
           toPgVectorLiteral(chunk.embedding),
+          chunk.pageStart ?? null,
+          chunk.pageEnd ?? null,
         ],
       );
     }

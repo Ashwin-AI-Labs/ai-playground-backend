@@ -77,6 +77,7 @@ describe("document processing", () => {
 
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks[0].index).toBe(0);
+    expect(chunks[0].pageStart).toBeNull();
     expect(chunks.every((chunk) => chunk.content.trim().length > 0)).toBe(true);
 
     const firstWords = chunks[0].content.split(/\s+/);

@@ -204,6 +204,8 @@ describe("semantic search service", () => {
         content: "work remotely up to three days",
         similarity: 0.91,
         documentCreatedAt: "2026-10-28T00:00:00.000Z",
+        pageStart: null,
+        pageEnd: null,
       },
     ]);
 

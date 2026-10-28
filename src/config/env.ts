@@ -53,6 +53,16 @@ const envSchema = z.object({
     .min(0)
     .max(1000)
     .default(120),
+  /** Optional dedicated generation model for RAG (defaults to OPENAI_MODEL). */
+  RAG_MODEL: z.string().optional().default(""),
+  RAG_DEFAULT_TOP_K: z.coerce.number().int().min(1).max(10).default(5),
+  /**
+   * Minimum cosine similarity to keep a retrieved chunk (0–1).
+   * Default 0.22 is intentionally permissive for embedding-3-small;
+   * it is not a calibrated confidence score.
+   */
+  RAG_SIMILARITY_THRESHOLD: z.coerce.number().min(0).max(1).default(0.22),
+  RAG_MAX_CONTEXT_CHARS: z.coerce.number().int().min(1000).max(50000).default(12000),
 });
 
 export type Env = z.infer<typeof envSchema>;

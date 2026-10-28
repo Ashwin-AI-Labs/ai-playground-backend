@@ -2,7 +2,7 @@ import path from "node:path";
 import { env } from "../../config/env";
 import { AppError } from "../../middleware/error-handler";
 import {
-  chunkText,
+  chunkExtractedDocument,
   extractDocumentText,
 } from "../../services/document-processing";
 import {
@@ -84,7 +84,7 @@ export function createSemanticSearchService(
       });
 
       try {
-        const chunks = chunkText(extracted.text, {
+        const chunks = chunkExtractedDocument(extracted, {
           chunkSize: env.SEMANTIC_SEARCH_CHUNK_SIZE,
           overlap: env.SEMANTIC_SEARCH_CHUNK_OVERLAP,
         });
@@ -107,6 +107,8 @@ export function createSemanticSearchService(
             index: chunk.index,
             content: chunk.content,
             embedding: embeddings[i],
+            pageStart: chunk.pageStart,
+            pageEnd: chunk.pageEnd,
           })),
         );
 
